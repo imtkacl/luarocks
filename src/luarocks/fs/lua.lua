@@ -339,7 +339,7 @@ end
 --- Recursively copy the contents of a directory.
 -- @param src string: Pathname of source
 -- @param dest string: Pathname of destination
--- @param perms string or nil: Optional permissions. 
+-- @param perms string or nil: Optional permissions.
 -- @return boolean or (boolean, string): true on success, false on failure,
 -- plus an error message.
 function fs_lua.copy_contents(src, dest, perms)
@@ -542,14 +542,14 @@ local redirect_protocols = {
 
 local function request(url, method, http, loop_control)
    local result = {}
-   
+
    local proxy = cfg.http_proxy
    if type(proxy) ~= "string" then proxy = nil end
    -- LuaSocket's http.request crashes when given URLs missing the scheme part.
    if proxy and not proxy:find("://") then
       proxy = "http://" .. proxy
    end
-   
+
    if cfg.show_downloads then
       io.write(method.." "..url.." ...\n")
    end
@@ -581,7 +581,7 @@ local function request(url, method, http, loop_control)
       io.write("\n")
    end
    if not res then
-      return nil, status
+      return nil, status, headers, err
    elseif status == 301 or status == 302 then
       local location = headers.location
       if location then
@@ -595,12 +595,12 @@ local function request(url, method, http, loop_control)
             loop_control[url] = true
             return request(location, method, redirect_protocols[protocol], loop_control)
          else
-            return nil, "URL redirected to unsupported protocol - install luasec to get HTTPS support.", "https"
+            return nil, status, headers, "URL redirected to unsupported protocol - install luasec to get HTTPS support."
          end
       end
-      return nil, err
+      return nil, status, headers, err
    elseif status ~= 200 then
-      return nil, err
+      return nil, status, headers, err
    else
       return result, status, headers, err
    end
@@ -614,10 +614,10 @@ local function http_request(url, http, cached)
          tsfd:close()
          local result, status, headers, err = request(url, "HEAD", http)
          if status == 200 and headers["last-modified"] == timestamp then
-            return true
+            return nil, nil, false
          end
          if not result then
-            return nil, status, headers
+            return nil, err, true
          end
       end
    end
@@ -632,7 +632,7 @@ local function http_request(url, http, cached)
       end
       return table.concat(result)
    else
-      return nil, status, headers
+      return nil, err, true
    end
 end
 
@@ -656,7 +656,7 @@ function fs_lua.download(url, filename, cache)
    if cfg.no_proxy then
       return fs.use_downloader(url, filename, cache)
    end
-   
+
    local content, err, https_err
    if util.starts_with(url, "http:") then
       content, err, https_err = http_request(url, http, cache and filename)
@@ -867,7 +867,7 @@ function fs_lua.is_lua(name)
   local lua = fs.Q(dir.path(cfg.variables["LUA_BINDIR"], cfg.lua_interpreter))  -- get lua interpreter configured
   -- execute on configured interpreter, might not be the same as the interpreter LR is run on
   local result = fs.execute_string(lua..[[ -e "if loadfile(']]..name..[[') then os.exit() else os.exit(1) end"]])
-  return (result == true) 
+  return (result == true)
 end
 
 return fs_lua
